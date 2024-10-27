@@ -1,0 +1,7 @@
+SQLAlchemy[asyncpg]==2.0.35
+alembic==1.13.3
+psycopg2==2.9.9
+asyncpg==0.29.0
+aio-pika==9.4.3
+fastapi==0.115.2
+uvicorn==0.31.0

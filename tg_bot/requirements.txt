@@ -1,0 +1,2 @@
+aiogram==3.13.1
+aio-pika==9.4.3
