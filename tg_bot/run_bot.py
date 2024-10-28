@@ -20,11 +20,11 @@ import bd_connect_module as main_bd
 import transcription_connection_module as tranc
 import s3_connect_module as s3
 
-from config import API_TOKEN
+# from config import API_TOKEN
 
 MAX_MESSAGE_LENGTH = 4000
 BD_API_URL = os.getenv('BD_API_URL')
-
+API_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
 
 bot = Bot(token=API_TOKEN)

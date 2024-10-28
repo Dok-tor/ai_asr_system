@@ -1,0 +1,118 @@
+services:
+
+  tg_bot:
+    build: ./tg_bot
+    container_name: tg_bot
+    restart: unless-stopped
+    networks:
+      - app_network
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+
+      - NN_API_URL=http://nn_service:8000/predict
+      - BD_API_URL=http://db_assist:8000
+      - S3_URL=http://data_loader:8001
+    depends_on:
+      - nn_service
+
+  nn_service:
+    build: ./nn_service
+    container_name: nn_service
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    networks:
+      - app_network
+
+    depends_on:
+      - s3
+
+  s3:
+    image: chrislusf/seaweedfs
+    command: 'server -s3 -dir /data'
+    container_name: s3
+    ports:
+      - "8333:8333"
+      - "8888:8888" # Web интерфейс для загрузки файлов
+      - "9333:9333"
+    networks:
+      - app_network
+    volumes:
+      - ./s3_data:/data  # Сохраняем данные объёмов
+
+    restart: unless-stopped
+
+
+  db:
+    image: postgres:13
+    restart: unless-stopped
+    container_name: db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    networks:
+      - app_network
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db_assist:
+    build: db_assist
+    container_name: db_assist
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+
+      DB_HOST: db
+    ports:
+      - 8000:8000
+    networks:
+      - app_network
+    volumes:
+      - ./db_assist/alembic/versions:/app/alembic/versions
+
+  data_loader:
+    build: data_load_service
+    container_name: data_loader
+    restart: unless-stopped
+    environment:
+      S3_ADDRESS: s3:8333
+      ACCESS_KEY: ${S3_ACCESS_KEY}
+      SECRET_KEY: ${S3_SECRET_KEY}
+      BUCKET_NAME: ${S3_BUCKET_NAME}
+
+      DOWNLOAD_DIR: /app/downloaded_from_s3
+
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: db
+    depends_on:
+      - db
+      - s3
+    ports:
+      - 8001:8001
+    networks:
+      - app_network
+    volumes:
+      - ./downloads:/app/downloaded_from_s3
+
+networks:
+  app_network:
+    driver: bridge
