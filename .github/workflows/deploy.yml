@@ -1,0 +1,49 @@
+name: Deploy on Push to Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up SSH agent
+      uses: webfactory/ssh-agent@v0.8.1
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Deploy to Server
+      env:
+        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_NAME: ${{ secrets.DB_NAME }}
+        S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+        S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+        S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          cd /home/${{ secrets.SSH_USER }}/projects/ai_asr_system
+
+          echo "Stopping existing containers..."
+          docker-compose down
+
+          echo "Pulling latest code from GitHub..."
+          git pull origin main
+
+          echo "Starting Docker containers..."
+          TELEGRAM_TOKEN=${TELEGRAM_TOKEN} \
+          DB_USER=${DB_USER} \
+          DB_PASSWORD=${DB_PASSWORD} \
+          DB_NAME=${DB_NAME} \
+          S3_ACCESS_KEY=${S3_ACCESS_KEY} \
+          S3_SECRET_KEY=${S3_SECRET_KEY} \
+          S3_BUCKET_NAME=${S3_BUCKET_NAME} \
+          docker-compose up -d --build
+        EOF
