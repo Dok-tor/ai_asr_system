@@ -27,8 +27,6 @@ services:
     networks:
       - app_network
 
-    depends_on:
-      - s3
 
   s3:
     image: chrislusf/seaweedfs

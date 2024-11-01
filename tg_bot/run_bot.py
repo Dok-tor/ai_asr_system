@@ -12,13 +12,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, File, InputFile, \
-    FSInputFile
+    FSInputFile, ReplyKeyboardMarkup, KeyboardButton
 from datetime import datetime
 import aiohttp
 
 import bd_connect_module as main_bd
 import transcription_connection_module as tranc
 import s3_connect_module as s3
+from messages_text import start_text, help_text
 
 # from config import API_TOKEN
 
@@ -53,11 +54,26 @@ class VoiceProcessing(StatesGroup):
     waiting_for_confirmation = State()
 
 
+main_keyboard = ReplyKeyboardMarkup(keyboard=[
+                                    [KeyboardButton(text="/start")],
+                                    [KeyboardButton(text="/help"), KeyboardButton(text="/balance")],
+                                    ], resize_keyboard=True)
+
+
 # Обработка команды /start
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     await main_bd.register_user(message.from_user.id)
-    await message.reply(text="Пришлите аудиосообщение:")
+
+    photo = FSInputFile("images/cat.png")
+
+    await message.answer_photo(
+        photo=photo,
+    )
+
+    await message.answer(text=start_text)
+
+    await message.reply(text="Пришлите аудиосообщение:", reply_markup=main_keyboard)
 
 
 # Обработка получения баланса
@@ -67,7 +83,12 @@ async def get_cash(message: Message):
     if cash is None:
         await message.reply(text="Произошла ошибка,\nПопробуйте позднее")
     else:
-        await message.reply(text=f"На счету у вас:\n{cash} Рублей")
+        await message.reply(text=f"На счету у вас:\n{cash:.2f} Монет")
+
+
+@dp.message(Command(commands=['help']))
+async def get_cash(message: Message):
+    await message.answer(text=help_text)
 
 
 # Обработка голосового сообщения
@@ -158,6 +179,8 @@ async def confirm_audio_processing(callback: CallbackQuery, state: FSMContext):
              InlineKeyboardButton(text='✅', callback_data=f'score:best:{transcription_id}'),
              ]])
 
+        await callback.message.edit_text("Аудио успешно распознано")
+
         await return_prediction(prediction, callback.message, get_score_keyboard)
 
     else:
@@ -190,6 +213,14 @@ async def get_audio_duration(filename: str) -> float:
     return float(info["format"]["duration"])
 
 
+async def calculate_balance(balance, duration_seconds):
+    k = 0.016 * 5
+    if 20 < duration_seconds < 30:
+        k *= 1.5
+    result = round(k * duration_seconds, 2)
+    return balance + result, result
+
+
 @dp.callback_query(F.data.startswith("score:"))
 async def feedback_transcription(callback: CallbackQuery):
     callback_data = callback.data.split(":")
@@ -199,8 +230,24 @@ async def feedback_transcription(callback: CallbackQuery):
     await callback.answer()
 
     status = await main_bd.set_transcription_score(transcription_id, score)
+
     if status:
         await callback.message.edit_reply_markup(reply_markup=None)
+
+    transcription = await main_bd.get_transcription_info(transcription_id)
+
+    if transcription:
+        duration = transcription['duration_seconds']
+        user_id = callback.from_user.id
+        user = await main_bd.get_user_info(user_id)
+
+        if user:
+            cash = user['cash']
+
+            new_cash, difference = await calculate_balance(cash, duration)
+            result = await main_bd.set_user_cash(user_id, new_cash)
+            if result:
+                await callback.message.answer(text=f"Спасибо за оценку!\nВам начислено:\n{difference:.2f} Монет")
 
 
 async def return_prediction(prediction: str, message: Message, keyboard: InlineKeyboardMarkup):
