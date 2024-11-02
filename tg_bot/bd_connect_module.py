@@ -85,3 +85,57 @@ async def set_transcription_score(transcription_id: int, score: int):
     except aiohttp.ClientError as e:
         logging.error(f"FastAPI connection error: {e}")
         return False
+
+
+async def set_user_cash(user_id, cash: float):
+    try:
+        async with aiohttp.ClientSession() as session:
+            transcription_data = {
+                'new_cash': cash
+            }
+            async with session.put(url=f'{BD_API_URL}/update-user-cash/{user_id}',
+                                   params=transcription_data) as resp:
+                if resp.status == 200:
+                    logging.info(f"User {user_id} updated cash")
+                    return True
+                else:
+                    logging.error(f"Error while updating user cash: {resp.status}")
+                    return False
+
+    except aiohttp.ClientError as e:
+        logging.error(f"FastAPI connection error: {e}")
+        return False
+
+
+async def set_user_role(user_id, role: int):
+    try:
+        async with aiohttp.ClientSession() as session:
+            transcription_data = {
+                'new_role': role
+            }
+            async with session.put(url=f'{BD_API_URL}/update-user-role/{user_id}',
+                                   params=transcription_data) as resp:
+                if resp.status == 200:
+                    logging.info(f"User {user_id} updated role ")
+                    return True
+                else:
+                    logging.error(f"Error while updating user role: {resp.status}")
+                    return False
+
+    except aiohttp.ClientError as e:
+        logging.error(f"FastAPI connection error: {e}")
+        return False
+
+
+async def get_transcription_info(transcription_id: int):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url=f'{BD_API_URL}/transcription/{transcription_id}') as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    logging.error(f"Error while getting transcription info: {resp.status}")
+                    return None
+    except aiohttp.ClientError as e:
+        logging.error(f"FastAPI connection error: {e}")
+        return None

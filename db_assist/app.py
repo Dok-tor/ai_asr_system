@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 # Импорт из моего модуля
 from db_actions import register_user, update_user, add_transcription, get_user_by_tg_id, get_transcriptions_by_user, \
-    get_transactions_by_date_range, set_transcription_score
+    get_transactions_by_date_range, set_transcription_score, get_transcription
 
 db_user = os.environ['DB_USER']
 db_pass = os.environ['DB_PASSWORD']
@@ -188,6 +188,54 @@ async def get_transactions(
         logger.error(f"Database error: {str(e)}")
         raise HTTPException(status_code=500, detail="Database error occurred")
 
+
+@app.get('/transcription/{transcription_id}')
+async def get_transcription_info(transcription_id: int, session: AsyncSession = Depends(get_session)):
+    try:
+        transcription = await get_transcription(transcription_id, session)
+        if not transcription:
+            raise HTTPException(status_code=404, detail="No transcription found")
+
+        return transcription
+    except SQLAlchemyError as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+
+
+@app.put("/update-user-cash/{user_id}")
+async def update_user_cash(user_id: int, new_cash: float, session: AsyncSession = Depends(get_session)):
+    try:
+        user = await update_user(user_id, session, cash=new_cash)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {
+                "status": "success",
+                "message": "User cash updated",
+        }
+    except SQLAlchemyError as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+
+@app.put("/update-user-role/{user_id}")
+async def update_user_role(user_id: int, new_role: int, session: AsyncSession = Depends(get_session)):
+    try:
+        user = await update_user(user_id, session, role=new_role)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {
+                "status": "success",
+                "message": "User role updated",
+        }
+    except SQLAlchemyError as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # Запуск Uvicorn при запуске скрипта
 if __name__ == "__main__":
