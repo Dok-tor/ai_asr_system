@@ -22,7 +22,10 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           cd /home/${{ secrets.SSH_USER }}/projects/ai_asr_system
-
+          
+          echo "Creating folders if they didn't exist"
+          mkdir -p pg_data s3_data
+          
           echo "Stopping existing containers..."
           docker compose down --volumes
 
