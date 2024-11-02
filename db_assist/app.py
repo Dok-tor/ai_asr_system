@@ -220,6 +220,23 @@ async def update_user_cash(user_id: int, new_cash: float, session: AsyncSession 
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
+@app.put("/update-user-role/{user_id}")
+async def update_user_role(user_id: int, new_role: int, session: AsyncSession = Depends(get_session)):
+    try:
+        user = await update_user(user_id, session, role=new_role)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {
+                "status": "success",
+                "message": "User role updated",
+        }
+    except SQLAlchemyError as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
 # Запуск Uvicorn при запуске скрипта
 if __name__ == "__main__":
     import uvicorn

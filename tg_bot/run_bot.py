@@ -19,7 +19,7 @@ import aiohttp
 import bd_connect_module as main_bd
 import transcription_connection_module as tranc
 import s3_connect_module as s3
-from messages_text import start_text, help_text
+from messages_text import start_text, help_text, beta_tester_update_text
 
 # from config import API_TOKEN
 
@@ -35,6 +35,13 @@ SCORE = {
     'bad': 1,
     'normal': 2,
     'best': 3,
+}
+
+ROLE = {
+    'user': 0,
+    'beta-tester': 1,
+    'unlimited': 2,
+    'admin': 3,
 }
 
 import hashlib
@@ -87,8 +94,16 @@ async def get_cash(message: Message):
 
 
 @dp.message(Command(commands=['help']))
-async def get_cash(message: Message):
+async def get_help(message: Message):
     await message.answer(text=help_text)
+
+
+@dp.message(Command(commands=['getrolebetatester$']))
+async def set_role_beta_tester(message: Message):
+    user_id = message.from_user.id
+    result = await main_bd.set_user_role(user_id, ROLE['beta-tester'])
+    if result:
+        await message.answer(text=beta_tester_update_text)
 
 
 # Обработка голосового сообщения
@@ -236,18 +251,30 @@ async def feedback_transcription(callback: CallbackQuery):
 
     transcription = await main_bd.get_transcription_info(transcription_id)
 
+    # Проверка получения информации по транскрипции
     if transcription:
+        # Получение длительности
         duration = transcription['duration_seconds']
         user_id = callback.from_user.id
+        # Получение данных о пользователе
         user = await main_bd.get_user_info(user_id)
 
         if user:
             cash = user['cash']
-
+            # Обновление счёта пользователя в соответствии с длительностью аудиосообщения
             new_cash, difference = await calculate_balance(cash, duration)
             result = await main_bd.set_user_cash(user_id, new_cash)
             if result:
                 await callback.message.answer(text=f"Спасибо за оценку!\nВам начислено:\n{difference:.2f} Монет")
+                # Проверка, если пользователь набрал 960 Монет, то его роль обновляется
+                if new_cash >= 960:
+                    if user['role'] < ROLE['beta-tester']:
+                        result_role = await main_bd.set_user_role(user_id, role=ROLE['beta-tester'])
+                        if result_role:
+                            await callback.message.answer(text=beta_tester_update_text)
+
+
+
 
 
 async def return_prediction(prediction: str, message: Message, keyboard: InlineKeyboardMarkup):

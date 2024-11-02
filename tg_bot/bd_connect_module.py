@@ -87,7 +87,7 @@ async def set_transcription_score(transcription_id: int, score: int):
         return False
 
 
-async def set_user_cash(user_id, cash: int):
+async def set_user_cash(user_id, cash: float):
     try:
         async with aiohttp.ClientSession() as session:
             transcription_data = {
@@ -100,6 +100,26 @@ async def set_user_cash(user_id, cash: int):
                     return True
                 else:
                     logging.error(f"Error while updating user cash: {resp.status}")
+                    return False
+
+    except aiohttp.ClientError as e:
+        logging.error(f"FastAPI connection error: {e}")
+        return False
+
+
+async def set_user_role(user_id, role: int):
+    try:
+        async with aiohttp.ClientSession() as session:
+            transcription_data = {
+                'new_role': role
+            }
+            async with session.put(url=f'{BD_API_URL}/update-user-role/{user_id}',
+                                   params=transcription_data) as resp:
+                if resp.status == 200:
+                    logging.info(f"User {user_id} updated role ")
+                    return True
+                else:
+                    logging.error(f"Error while updating user role: {resp.status}")
                     return False
 
     except aiohttp.ClientError as e:
